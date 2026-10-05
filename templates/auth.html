@@ -1,0 +1,26 @@
+{% extends "base.html" %}{% block title %}{{ 'Set up' if mode=='setup' else 'Sign in' }}{% endblock %}
+{% block content %}
+<div class="auth panel">
+{% if mode=='setup' %}
+  <h1>Set up your <span class="grad">Me</span> profile</h1>
+  <p class="muted">Creates one local learner account on this computer. Goals, course history and assessments may be sent to the LLM provider you choose to personalize courses and grading. Username, password and display name are not sent. The SQLite file is local and not encrypted at rest.</p>
+  <form method="post" class="form">
+    <label>Your name or display name<input name="display_name" required></label>
+    <label>Username<input name="username" required autocomplete="username"></label>
+    <div class="row2"><label>Password (min 8 characters)<input type="password" name="password" required minlength="8" autocomplete="new-password"></label>
+    <label>Confirm password<input type="password" name="confirm" required autocomplete="new-password"></label></div>
+    <label>Long-term learning goal<input name="long_goal"></label>
+    <label>Short-term learning goal<input name="short_goal"></label>
+    <label>Starting level<select name="level">{% for l in levels %}<option>{{ l }}</option>{% endfor %}</select></label>
+    <button class="btn primary">Create profile</button>
+  </form>
+{% else %}
+  <h1>Sign in to <span class="grad">Pxplore</span></h1>
+  <form method="post" class="form">
+    <label>Username<input name="username" required autocomplete="username" autofocus></label>
+    <label>Password<input type="password" name="password" required autocomplete="current-password"></label>
+    <button class="btn primary">Sign in</button>
+  </form>
+{% endif %}
+</div>
+{% endblock %}

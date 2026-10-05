@@ -1,0 +1,11 @@
+Infer the learner's preferred instructional approach from the saved learning record. This is a tentative personalization hypothesis, not a fixed psychological learning-style label. Performance scores alone do not prove a learning style.
+
+Consider repeated assessment outcomes, course approaches, stated goals, and evidence in prior results. Prefer concrete approaches such as worked examples, hands-on practice, concise explanations, scenarios, or visual summaries. If there is too little evidence or no reliable pattern, say that clearly.
+
+Return JSON only:
+{
+  "preferred_style": "short, actionable description",
+  "confidence": "low|medium|high",
+  "evidence": ["specific evidence from saved learning record"],
+  "caveat": "brief uncertainty note"
+}

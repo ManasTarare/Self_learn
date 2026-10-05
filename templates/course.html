@@ -1,0 +1,52 @@
+{% extends "base.html" %}{% block title %}{{ c.title }}{% endblock %}
+{% block content %}
+<a class="muted" href="{{ url_for('learn') }}">← Back to Learn</a>
+<h1>{{ c.title }}</h1>
+<p class="muted">{{ c.level }} · about {{ c.get('estimated_minutes','—') }} min · Status: {{ row.status }}</p>
+{% if row.source_title %}<p class="muted">Generated from Microsoft Learn module: <b>{{ row.source_title }}</b>{% if row.source_url %} · <a class="link" href="{{ row.source_url }}" target="_blank" rel="noopener">Open source module ↗</a>{% endif %}</p>{% endif %}
+{% if c.recommendation_reason %}<div class="panel"><b>Why this was recommended</b><p>{{ c.recommendation_reason }}</p></div>{% endif %}
+
+<h2>Learning objectives</h2><ul>{% for o in c.get('objectives',[]) %}<li>{{ o }}</li>{% endfor %}</ul>
+{% if c.prerequisites %}<p class="muted">Prerequisites: {{ c.prerequisites|join(', ') }}</p>{% endif %}
+
+<h2>Course lessons</h2>
+{% for l in c.get('lessons',[]) %}
+<details class="panel" {{ 'open' if loop.first }}><summary>{{ loop.index }}. {{ l.get('title','Lesson') }} · {{ l.get('duration_min','?') }} min</summary>
+  <div class="md">{{ l.get('content','')|md }}</div>
+  <p><b>Try this:</b> {{ l.get('activity','') }}</p>
+  {% if l.concepts %}<p class="muted">Concepts: {{ l.concepts|join(', ') }}</p>{% endif %}
+</details>{% endfor %}
+
+{% set qs = c.get('quiz',{}).get('questions',[]) %}
+{% if qs %}<h2 id="quiz">{{ c.quiz.get('title','Knowledge check') }}</h2>
+<form method="post" action="{{ url_for('submit_quiz', cid=row.id) }}" class="panel form">
+  {% for q in qs %}{% set i = loop.index0 %}
+  <fieldset class="q"><legend>{{ loop.index }}. {{ q.get('question','') }}</legend>
+    {% for o in q.get('options',[]) %}<label class="opt"><input type="radio" name="q{{ i }}" value="{{ loop.index0 }}" required> {{ o }}</label>{% endfor %}
+  </fieldset>{% endfor %}
+  <button class="btn primary">Submit quiz</button>
+</form>
+{% if last.quiz %}{% set r = last.quiz %}
+<div class="alert success">Latest quiz result: {{ r.score }}/{{ r.max_score }} ({{ (100*r.score/[r.max_score,1]|max)|round|int }}%)</div>
+{% for d in r.details %}<p>{{ '✅' if d.is_correct else '↻' }} {{ d.question }}<br><small class="muted">{{ d.explanation }}</small></p>{% endfor %}{% endif %}
+{% endif %}
+
+{% set a = c.get('assignment') %}
+{% if a %}<h2 id="assignment">{{ a.get('title','Practical assignment') }}</h2>
+<p>{{ a.get('prompt','') }}</p><p class="muted">Deliverable: {{ a.get('deliverable','Submit your work below.') }}</p>
+{% if a.rubric %}<table><thead><tr>{% for k in a.rubric[0].keys() %}<th>{{ k }}</th>{% endfor %}</tr></thead>
+<tbody>{% for r in a.rubric %}<tr>{% for v in r.values() %}<td>{{ v }}</td>{% endfor %}</tr>{% endfor %}</tbody></table>{% endif %}
+<form method="post" action="{{ url_for('submit_assignment', cid=row.id) }}" class="panel form" id="asg">
+  <label>Your assignment response<textarea name="submission" rows="9" required></textarea></label>
+  <button class="btn primary">Submit assignment for feedback</button>
+</form>
+{% if last.assignment %}{% set r = last.assignment %}
+<div class="alert success">Assignment score: {{ r.score|round|int }}/100</div>
+<p>{{ r.get('feedback','') }}</p>
+<ul>{% for s in r.get('strengths',[]) %}<li><b>Strength:</b> {{ s }}</li>{% endfor %}{% for s in r.get('next_steps',[]) %}<li><b>Next step:</b> {{ s }}</li>{% endfor %}</ul>{% endif %}
+{% endif %}
+
+{% if row.status != 'completed' %}
+<form method="post" action="{{ url_for('mark_complete', cid=row.id) }}"><button class="btn ghost">Mark course complete</button></form>{% endif %}
+<script>document.getElementById('asg')?.addEventListener('submit',e=>{const b=e.target.querySelector('button');b.disabled=true;b.textContent='Reviewing your assignment…'})</script>
+{% endblock %}

@@ -1,0 +1,61 @@
+{% extends "base.html" %}{% block title %}Me{% endblock %}
+{% block content %}
+<h1>Me</h1>
+<p class="muted">Your profile database is local. Goals, study notes, course and assessment summaries, quiz results and assignment submissions can be sent to the selected LLM provider for personalization and grading. Username, password and display name are not sent.</p>
+<div class="tabs"><button data-t="t1" class="on">Profile</button><button data-t="t2">Knowledge graph</button><button data-t="t3">Learning record</button></div>
+
+<section id="t1" class="tab on">
+  <form method="post" action="{{ url_for('save_profile') }}" class="panel form">
+    <label>Name<input name="display_name" value="{{ profile.display_name }}" required></label>
+    <label>Long-term goal<input name="long_goal" value="{{ profile.long_term_goal }}"></label>
+    <label>Short-term goal<input name="short_goal" value="{{ profile.short_term_goal }}"></label>
+    <label>Current level<select name="level">{% for l in levels %}<option {{ 'selected' if l==profile.level }}>{{ l }}</option>{% endfor %}</select></label>
+    <button class="btn primary">Save profile</button>
+  </form>
+  <h2>Inferred learning approach</h2>
+  <p>{{ profile.preferred_style }}</p>
+  <p class="muted">Confidence: {{ profile.style_confidence }}. This is a tentative preference inferred from your learning record.</p>
+  <ul>{% for e in evidence %}<li>{{ e }}</li>{% endfor %}</ul>
+  <p class="muted">We avoid treating one test score as proof of a fixed learning style.</p>
+  <details class="panel"><summary>Change password</summary>
+    <form method="post" action="{{ url_for('change_password') }}" class="form">
+      <label>Current password<input type="password" name="old" required></label>
+      <label>New password<input type="password" name="new" required minlength="8"></label>
+      <label>Confirm new password<input type="password" name="confirm" required></label>
+      <button class="btn ghost">Update password</button></form></details>
+  <details class="panel danger"><summary>Erase your profile and all learning data</summary>
+    <p class="muted">This deletes your saved goals, generated courses, assessment results and knowledge graph.</p>
+    <form method="post" action="{{ url_for('erase') }}" class="form" onsubmit="return confirm('Erase everything? This cannot be undone.')">
+      <label>Type ERASE to confirm<input name="confirm_text" required></label>
+      <label>Enter your password<input type="password" name="password" required></label>
+      <button class="btn danger-btn">Erase everything</button></form></details>
+</section>
+
+<section id="t2" class="tab">
+  <p class="muted">Hover a node to focus its connections, click to pin, drag to rearrange, scroll to zoom. The green ring on a concept shows estimated mastery.</p>
+  <iframe data-src="{{ url_for('graph') }}" class="graphframe" title="Knowledge graph"></iframe>
+</section>
+
+<section id="t3" class="tab">
+  <div class="metrics">
+    <div class="metric"><small>Courses completed</small><b>{{ record.completed_count }}</b></div>
+    <div class="metric"><small>Average assessment score</small><b>{{ (record.average_score ~ '%') if record.average_score is not none else '—' }}</b></div>
+  </div>
+  {% if record.courses %}<table><thead><tr><th>Course</th><th>Level</th><th>Status</th><th>Score</th></tr></thead><tbody>
+  {% for c in record.courses %}<tr><td><a class="link" href="{{ url_for('course', cid=c.id) }}">{{ c.title }}</a></td><td>{{ c.level }}</td><td>{{ c.status }}</td><td>{{ (c.result_pct ~ '%') if c.result_pct is not none else '—' }}</td></tr>{% endfor %}</tbody></table>
+  {% else %}<div class="alert info">Your generated courses will appear here.</div>{% endif %}
+  {% if assessments %}<h2>Assessments</h2>
+  {% for a in assessments %}<details class="panel"><summary>{{ a.title }} · {{ a.kind }} · {{ a.score }}/{{ a.max_score }} · <span class="muted">{{ a.submitted_at }}</span></summary>
+    {% if a.kind=='quiz' %}{% for d in a.detail.get('details',[]) %}<p><b>{{ 'Correct' if d.is_correct else 'Review' }}:</b> {{ d.question }}<br>Your answer: {{ d.answer }}<br><small class="muted">{{ d.explanation }}</small></p>{% endfor %}
+    {% else %}<p>{{ a.detail.get('feedback','') }}</p>{% if a.detail.get('submission') %}<b>Submitted work</b><pre class="plain">{{ a.detail.submission }}</pre>{% endif %}{% endif %}
+  </details>{% endfor %}{% endif %}
+  {% if record.notes %}<details class="panel"><summary>Recent study notes</summary>{% for n in record.notes %}<p>{{ n.note }}<br><small class="muted">{{ n.created_at }}</small></p>{% endfor %}</details>{% endif %}
+</section>
+<script>
+const fr=document.querySelector('.graphframe');
+function show(id){document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.id===id));document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t===id));
+  if(id==='t2'&&!fr.src)fr.src=fr.dataset.src;history.replaceState(null,'','#'+id)}
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>show(b.dataset.t));
+if(['t2','t3'].includes(location.hash.slice(1)))show(location.hash.slice(1));
+</script>
+{% endblock %}

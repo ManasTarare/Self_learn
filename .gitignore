@@ -1,0 +1,12 @@
+﻿.venv/
+__pycache__/
+*.pyc
+.env
+.secret_key
+.llm_cache/
+.streamlit/
+*.zip
+data/*
+!data/.gitkeep
+learn/
+app.py
