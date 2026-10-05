@@ -11,3 +11,4 @@ flask
 python-dotenv
 markdown
 bleach
+gunicorn
