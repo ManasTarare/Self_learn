@@ -161,6 +161,28 @@ def _raw_call(messages, model, provider, json_out):
     return r.choices[0].message.content
 
 
+# If every Gemini model is busy, fall back to another provider whose API key is set.
+FALLBACK_PROVIDERS = [
+    ("anthropic", "ANTHROPIC_API_KEY", os.getenv("FALLBACK_ANTHROPIC_MODEL", "claude-sonnet-5-5")),
+    ("openai", "OPENAI_API_KEY", os.getenv("FALLBACK_OPENAI_MODEL", "gpt-4o")),
+]
+
+
+def _raw_call_with_fallback(messages, model, provider, json_out):
+    try:
+        return _raw_call(messages, model, provider, json_out)
+    except RuntimeError as e:
+        text = str(e).lower()
+        gemini_busy = provider == "gemini" and ("temporarily unavailable" in text or "rate limit" in text)
+        if not gemini_busy:
+            raise
+        for p, env, m in FALLBACK_PROVIDERS:
+            if os.getenv(env):
+                print(f"[llm] Gemini unavailable, falling back to {p} ({m})")
+                return _raw_call(messages, m, p, json_out)
+        raise
+
+
 def call(messages, model="gpt-4o", provider="openai", json_out=False):
     key = hashlib.sha256(json.dumps([provider, model, json_out, messages],
                                     ensure_ascii=False).encode()).hexdigest()
@@ -177,7 +199,7 @@ def call(messages, model="gpt-4o", provider="openai", json_out=False):
             p.unlink(missing_ok=True)      # corrupt entry: drop it and ask again
 
     # 2) call the API; only cache what we could actually use
-    out = _raw_call(messages, model, provider, json_out)
+    out = _raw_call_with_fallback(messages, model, provider, json_out)
     if json_out:
         parsed = parse_json(out)           # raises ValueError if the model returned broken JSON
         p.write_text(out, encoding="utf-8")
