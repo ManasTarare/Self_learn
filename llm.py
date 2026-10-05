@@ -62,23 +62,35 @@ def _split(messages):
 
 
 GEMINI_FALLBACKS = [m.strip() for m in os.getenv(
-    "GEMINI_FALLBACK_MODELS", "gemini-3.6-flash,gemini-3.8-flash").split(",") if m.strip()]
+    "GEMINI_FALLBACK_MODELS", "gemini-3.6-flash,gemini-3.7-flash,gemini-3.8-flash").split(",") if m.strip()]
 
 
-def _gemini_generate(client, model, user, cfg):
-    """Retry overloaded Gemini calls (500/503/504), then fall back to other models."""
+def _gemini_generate(client, model, user, cfg, passes=2):
+    """Try the chosen model, then the fallback chain in order (3.6 -> 3.7 -> 3.8).
+
+    - 500/503/504 (overloaded): move on to the next model, pause briefly between models.
+    - 404 (model not available to this key): skip it and try the next one.
+    - Any other error (bad key, bad request, 429 quota): raised immediately.
+    The whole chain is tried `passes` times before giving up.
+    """
+    chain = [model] + [m for m in GEMINI_FALLBACKS if m != model]
     last = None
-    for m in [model] + [x for x in GEMINI_FALLBACKS if x != model]:
-        for attempt in range(2):
+    for p in range(passes):
+        for m in chain:
             try:
                 return client.models.generate_content(model=m, contents=user, config=cfg)
             except Exception as e:
                 code = getattr(e, "code", None) or getattr(e, "status_code", None)
-                if code not in (500, 503, 504) and "unavailable" not in str(e).lower():
+                text = str(e).lower()
+                busy = code in (500, 503, 504) or "unavailable" in text
+                missing = code == 404 or "not_found" in text
+                if not (busy or missing):
                     raise
                 last = e
-                print(f"[llm] Gemini {m} unavailable (attempt {attempt + 1}/2), retrying...")
-                time.sleep(5)
+                print(f"[llm] Gemini {m} {'unavailable' if busy else 'not found'} "
+                      f"(pass {p + 1}/{passes}), trying next model...")
+                if busy:
+                    time.sleep(3)
     raise last
 
 
