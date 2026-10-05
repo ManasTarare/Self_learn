@@ -61,6 +61,27 @@ def _split(messages):
     return system, rest
 
 
+GEMINI_FALLBACKS = [m.strip() for m in os.getenv(
+    "GEMINI_FALLBACK_MODELS", "gemini-3.6-flash,gemini-3.8-flash").split(",") if m.strip()]
+
+
+def _gemini_generate(client, model, user, cfg):
+    """Retry overloaded Gemini calls (500/503/504), then fall back to other models."""
+    last = None
+    for m in [model] + [x for x in GEMINI_FALLBACKS if x != model]:
+        for attempt in range(2):
+            try:
+                return client.models.generate_content(model=m, contents=user, config=cfg)
+            except Exception as e:
+                code = getattr(e, "code", None) or getattr(e, "status_code", None)
+                if code not in (500, 503, 504) and "unavailable" not in str(e).lower():
+                    raise
+                last = e
+                print(f"[llm] Gemini {m} unavailable (attempt {attempt + 1}/2), retrying...")
+                time.sleep(5)
+    raise last
+
+
 def _raw_call(messages, model, provider, json_out):
     """One uncached API call. Returns the raw text."""
     _throttle(provider)
@@ -80,7 +101,7 @@ def _raw_call(messages, model, provider, json_out):
         # google-genai already retries transient API errors internally. Avoid wrapping
         # it in another long retry loop, which multiplies attempts for 429 responses.
         try:
-            r = client.models.generate_content(model=model, contents=user, config=cfg)
+            r = _gemini_generate(client, model, user, cfg)
         except Exception as e:
             code = getattr(e, "code", None) or getattr(e, "status_code", None)
             message = str(e).lower()
