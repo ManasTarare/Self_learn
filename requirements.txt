@@ -1,14 +1,10 @@
+flask
+gunicorn
 rank-bm25
-sentence-transformers
+numpy
 openai
 anthropic
-numpy
-pandas
 google-genai
-python-dotenv
-streamlit
-flask
 python-dotenv
 markdown
 bleach
-gunicorn
