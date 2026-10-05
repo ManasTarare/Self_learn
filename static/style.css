@@ -76,7 +76,7 @@ footer .wrap{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px}
 .row2{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
 input,select,textarea{width:100%;padding:10px 13px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);font:inherit;font-size:15px;outline:none;transition:border-color .15s}
 input:focus,select:focus,textarea:focus{border-color:var(--accent)}
-input[type=radio]{width:auto}
+input[type=radio],input[type=checkbox]{width:auto;padding:0;margin:0;flex:0 0 auto;accent-color:var(--accent)}
 .alert{padding:12px 16px;border-radius:10px;margin:12px 0;border:1px solid var(--line);background:var(--surface);font-size:14.5px}
 .alert.success{border-color:#3d5a4e;color:#b5dccb}.alert.error{border-color:#6a3f4c;color:#ecc1cd}
 .alert.warn{border-color:#66573a;color:#e6d3a8}.alert.info{border-color:#3a4a66;color:#bccbe6}
@@ -91,6 +91,10 @@ details[open]>summary{margin-bottom:12px}
 .q{border:0;padding:0;margin:0 0 16px}.q legend{font-weight:600;margin-bottom:8px}
 .opt{display:flex;gap:10px;align-items:center;padding:9px 13px;border:1px solid var(--line);border-radius:9px;margin:6px 0;cursor:pointer;color:var(--text)!important;transition:background .15s}
 .opt:hover{background:var(--surface2)}
+/* quiz fix: ".form label" (display:grid) was beating ".opt" and stacking the radio above its text */
+label.opt,.form label.opt{display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:12px;font-size:15px;text-align:left}
+label.opt input[type=radio]{width:auto;margin:0;padding:0;flex:0 0 auto}
+label.opt span{flex:1 1 auto}
 .tabs{display:flex;gap:4px;margin:20px 0;border-bottom:1px solid var(--line)}
 .tabs button{background:none;border:0;color:var(--muted);font:600 14.5px Inter,sans-serif;padding:10px 16px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
 .tabs button:hover{color:var(--text)}.tabs button.on{color:var(--text);border-color:var(--accent)}
