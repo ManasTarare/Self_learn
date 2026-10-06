@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Pxplore · Personalized learning paths</title>
+  <meta name="description" content="Goal-driven personalized learning paths with a living knowledge graph.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧭</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header class="nav"><div class="wrap">
+    <a class="brand" href="#top"><span>🧭</span><b class="grad">Pxplore</b></a>
+    <ul><li><a href="#features">Features</a></li><li><a href="#how">How it works</a></li><li><a href="#start">Get started</a></li></ul>
+  </div></header>
+
+  <main id="top">
+    <div class="hero">
+      <canvas id="bg"></canvas>
+      <div class="wrap">
+        <h1>Learn what matters, <span class="grad">in the order that works for you.</span></h1>
+        <p>Pxplore builds a personalized learning path from your goals, tracks mastery with quick assessments, and grows a living knowledge graph of everything you know.</p>
+        <div class="cta">
+          <a class="btn primary" href="{{ app_url or 'http://localhost:8501' }}">Start learning →</a>
+        </div>
+      </div>
+    </div>
+
+    <section id="features"><div class="wrap">
+      <div class="eyebrow reveal">Features</div>
+      <h2 class="reveal">Everything adapts to <span class="grad">you</span></h2>
+      <p class="lead reveal">One learner profile drives your courses, lessons and quizzes, so nothing is generic.</p>
+      <div class="grid">
+        <article class="card reveal" style="--c:#6b9bd1"><div class="ico">🎯</div><h3>Goal-based paths</h3><p>Set long-term and short-term goals and get a course structure planned around them.</p></article>
+        <article class="card reveal" style="--c:#9a8fc4"><div class="ico">🧩</div><h3>Adaptive lessons</h3><p>Lessons are generated for your level and learning style, then refined as you progress.</p></article>
+        <article class="card reveal" style="--c:#6fb59a"><div class="ico">📈</div><h3>Mastery tracking</h3><p>Knowledge checks estimate how well you understand each concept, with evidence behind it.</p></article>
+        <article class="card reveal" style="--c:#c98aa6"><div class="ico">🕸️</div><h3>Knowledge graph</h3><p>See courses, lessons and concepts connected in one interactive, explorable map.</p></article>
+      </div>
+    </div></section>
+
+    <section id="how"><div class="wrap">
+      <div class="eyebrow reveal">How it works</div>
+      <h2 class="reveal">From goal to mastery in four steps</h2>
+      <div class="steps">
+        <div class="step reveal"><h4>Create your profile</h4><p>Tell Pxplore who you are and what you want to achieve.</p></div>
+        <div class="step reveal"><h4>Get a learning path</h4><p>A personalized course with lessons and key concepts is generated.</p></div>
+        <div class="step reveal"><h4>Learn and get tested</h4><p>Work through lessons and take short knowledge checks.</p></div>
+        <div class="step reveal"><h4>Watch your graph grow</h4><p>Mastery updates and your knowledge graph expands with you.</p></div>
+      </div>
+    </div></section>
+
+    <section id="start"><div class="wrap">
+      <div class="band reveal">
+        <h2>Ready to <span class="grad">explore</span>?</h2>
+        <p>Create your profile and generate your first personalized course in minutes.</p>
+        <a class="btn primary" href="{{ app_url or 'http://localhost:8501' }}">Launch Pxplore →</a>
+      </div>
+    </div></section>
+  </main>
+
+  <footer><div class="wrap"><span>© {{ year or 2026 }} Pxplore</span><span>Built by Raven AI</span></div></footer>
+
+<script>
+/* animated knowledge-graph background */
+(()=>{const c=document.getElementById('bg'),x=c.getContext('2d');
+const cols=['#5b8def','#8a93a1','#6fb59a','#8a93a1'];let W,H,P=[];
+function init(){const r=c.getBoundingClientRect(),d=Math.min(devicePixelRatio||1,2);W=r.width;H=r.height;c.width=W*d;c.height=H*d;x.setTransform(d,0,0,d,0,0);
+ const n=Math.round(Math.min(70,W*H/16000));P=Array.from({length:n},()=>({x:Math.random()*W,y:Math.random()*H,vx:(Math.random()-.5)*.25,vy:(Math.random()-.5)*.25,r:1.6+Math.random()*2.4,c:cols[Math.random()*4|0]}))}
+function loop(){x.clearRect(0,0,W,H);
+ for(const p of P){p.x+=p.vx;p.y+=p.vy;if(p.x<0||p.x>W)p.vx*=-1;if(p.y<0||p.y>H)p.vy*=-1}
+ for(let i=0;i<P.length;i++)for(let j=i+1;j<P.length;j++){const a=P[i],b=P[j],d=Math.hypot(a.x-b.x,a.y-b.y);
+  if(d<140){x.globalAlpha=(1-d/140)*.28;x.strokeStyle='#6b7480';x.lineWidth=1;x.beginPath();x.moveTo(a.x,a.y);x.lineTo(b.x,b.y);x.stroke()}}
+ x.globalAlpha=1;for(const p of P){x.beginPath();x.arc(p.x,p.y,p.r,0,7);x.fillStyle=p.c;x.fill()}
+ requestAnimationFrame(loop)}
+addEventListener('resize',init);init();loop()})();
+/* reveal on scroll */
+const io=new IntersectionObserver(e=>e.forEach(i=>{if(i.isIntersecting){i.target.classList.add('in');io.unobserve(i.target)}}),{threshold:.12});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+</body>
+</html>
