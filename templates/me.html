@@ -34,6 +34,9 @@
 <section id="t2" class="tab">
   <p class="muted">Hover a node to focus its connections, click to pin, drag to rearrange, scroll to zoom. The green ring on a concept shows estimated mastery.</p>
   <iframe data-src="{{ url_for('graph') }}" class="graphframe" title="Knowledge graph"></iframe>
+  <h2>Recent study notes</h2>
+  {% if record.notes %}<div class="panel">{% for n in record.notes %}<p>{{ n.note }}<br><small class="muted">{{ n.created_at }}</small></p>{% endfor %}</div>
+  {% else %}<div class="alert info">Your recent study notes will appear here.</div>{% endif %}
 </section>
 
 <section id="t3" class="tab">
@@ -49,7 +52,6 @@
     {% if a.kind=='quiz' %}{% for d in a.detail.get('details',[]) %}<p><b>{{ 'Correct' if d.is_correct else 'Review' }}:</b> {{ d.question }}<br>Your answer: {{ d.answer }}<br><small class="muted">{{ d.explanation }}</small></p>{% endfor %}
     {% else %}<p>{{ a.detail.get('feedback','') }}</p>{% if a.detail.get('submission') %}<b>Submitted work</b><pre class="plain">{{ a.detail.submission }}</pre>{% endif %}{% endif %}
   </details>{% endfor %}{% endif %}
-  {% if record.notes %}<details class="panel"><summary>Recent study notes</summary>{% for n in record.notes %}<p>{{ n.note }}<br><small class="muted">{{ n.created_at }}</small></p>{% endfor %}</details>{% endif %}
 </section>
 <script>
 const fr=document.querySelector('.graphframe');
