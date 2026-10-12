@@ -61,6 +61,39 @@ def _split(messages):
     return system, rest
 
 
+GEMINI_FALLBACKS = [m.strip() for m in os.getenv(
+    "GEMINI_FALLBACK_MODELS", "gemini-3.6-flash,gemini-3.7-flash,gemini-3.8-flash").split(",") if m.strip()]
+
+
+def _gemini_generate(client, model, user, cfg, passes=2):
+    """Try the chosen model, then the fallback chain in order (3.6 -> 3.7 -> 3.8).
+
+    - 500/503/504 (overloaded): move on to the next model, pause briefly between models.
+    - 404 (model not available to this key): skip it and try the next one.
+    - Any other error (bad key, bad request, 429 quota): raised immediately.
+    The whole chain is tried `passes` times before giving up.
+    """
+    chain = [model] + [m for m in GEMINI_FALLBACKS if m != model]
+    last = None
+    for p in range(passes):
+        for m in chain:
+            try:
+                return client.models.generate_content(model=m, contents=user, config=cfg)
+            except Exception as e:
+                code = getattr(e, "code", None) or getattr(e, "status_code", None)
+                text = str(e).lower()
+                busy = code in (500, 503, 504) or "unavailable" in text
+                missing = code == 404 or "not_found" in text
+                if not (busy or missing):
+                    raise
+                last = e
+                print(f"[llm] Gemini {m} {'unavailable' if busy else 'not found'} "
+                      f"(pass {p + 1}/{passes}), trying next model...")
+                if busy:
+                    time.sleep(3)
+    raise last
+
+
 def _raw_call(messages, model, provider, json_out):
     """One uncached API call. Returns the raw text."""
     _throttle(provider)
@@ -80,7 +113,7 @@ def _raw_call(messages, model, provider, json_out):
         # google-genai already retries transient API errors internally. Avoid wrapping
         # it in another long retry loop, which multiplies attempts for 429 responses.
         try:
-            r = client.models.generate_content(model=model, contents=user, config=cfg)
+            r = _gemini_generate(client, model, user, cfg)
         except Exception as e:
             code = getattr(e, "code", None) or getattr(e, "status_code", None)
             message = str(e).lower()
@@ -128,6 +161,28 @@ def _raw_call(messages, model, provider, json_out):
     return r.choices[0].message.content
 
 
+# If every Gemini model is busy, fall back to another provider whose API key is set.
+FALLBACK_PROVIDERS = [
+    ("anthropic", "ANTHROPIC_API_KEY", os.getenv("FALLBACK_ANTHROPIC_MODEL", "claude-sonnet-5-5")),
+    ("openai", "OPENAI_API_KEY", os.getenv("FALLBACK_OPENAI_MODEL", "gpt-4o")),
+]
+
+
+def _raw_call_with_fallback(messages, model, provider, json_out):
+    try:
+        return _raw_call(messages, model, provider, json_out)
+    except RuntimeError as e:
+        text = str(e).lower()
+        gemini_busy = provider == "gemini" and ("temporarily unavailable" in text or "rate limit" in text)
+        if not gemini_busy:
+            raise
+        for p, env, m in FALLBACK_PROVIDERS:
+            if os.getenv(env):
+                print(f"[llm] Gemini unavailable, falling back to {p} ({m})")
+                return _raw_call(messages, m, p, json_out)
+        raise
+
+
 def call(messages, model="gpt-4o", provider="openai", json_out=False):
     key = hashlib.sha256(json.dumps([provider, model, json_out, messages],
                                     ensure_ascii=False).encode()).hexdigest()
@@ -144,7 +199,7 @@ def call(messages, model="gpt-4o", provider="openai", json_out=False):
             p.unlink(missing_ok=True)      # corrupt entry: drop it and ask again
 
     # 2) call the API; only cache what we could actually use
-    out = _raw_call(messages, model, provider, json_out)
+    out = _raw_call_with_fallback(messages, model, provider, json_out)
     if json_out:
         parsed = parse_json(out)           # raises ValueError if the model returned broken JSON
         p.write_text(out, encoding="utf-8")
