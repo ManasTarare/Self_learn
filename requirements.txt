@@ -1,5 +1,11 @@
-flask
-gunicorn
+# Web app (FastAPI replaces flask + gunicorn)
+fastapi>=0.110
+uvicorn[standard]
+jinja2
+itsdangerous
+python-multipart
+
+# Unchanged from the previous requirements.txt
 rank-bm25
 numpy
 openai

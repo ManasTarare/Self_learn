@@ -1,28 +1,67 @@
 # Pxplore
 
-Pxplore recommends a Microsoft Learn module, then asks an LLM to generate an original, structured course grounded in that module and personalized with your saved learning history. The app uses Streamlit.
+Pxplore recommends a Microsoft Learn module, then asks an LLM to generate an original, structured course grounded in that module and personalized with your saved learning history. The app uses FastAPI (server-rendered pages, served by uvicorn).
 
 ## Setup (Windows PowerShell)
 
-    python -m venv .venv
-    .venv\Scripts\activate
-    pip install -r requirements.txt
-    Copy-Item .env.example .env
-    # Add one provider key to .env
+```
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+Copy-Item .env.example .env
+# Add one provider key to .env
+```
 
 Provider priority for automatic selection is Gemini, then Anthropic, then OpenAI. The provider and model can also be selected in the app.
 
 ## Prepare course data
 
-    python convert_mslearn.py data/mslearn_course_structures.json data/snippets.jsonl
+```
+python convert_mslearn.py data/mslearn_course_structures.json data/snippets.jsonl
+```
 
 The repository includes prepared data/snippets.jsonl and data/snippets_full.jsonl. The full file includes lesson text where available. The optional lesson fetch workflow is described in fetch_content.py.
 
 ## Run
 
-    streamlit run app.py
+```
+python server.py
+```
+
+or, with auto-reload while developing:
+
+```
+uvicorn server:app --host 0.0.0.0 --port 5000 --reload
+```
+
+Then open http://localhost:5000. Interactive API docs (Swagger UI) are at http://localhost:5000/docs and ReDoc at http://localhost:5000/redoc.
+
+Environment variables: `HOST` (default 0.0.0.0), `PORT` (default 5000), `SECRET_KEY` (session signing key; generated into `.secret_key` if not set), `PX_MODEL` (default model), `PX_RELOAD=1` (auto-reload when using `python server.py`).
 
 On first launch, create a local Me profile with a name, username, password, long-term goal, short-term goal, and starting level. The app stores the account and learning data in data/student_memory.db. Passwords are salted and hashed; they are never stored as plain text. The app supports one local learner account. Use Me → Profile → Erase your profile and all learning data to remove it and its learning history.
+
+## API endpoints
+
+| Method | Endpoint | Login needed | Purpose |
+| --- | --- | --- | --- |
+| GET | `/` | No | Landing page |
+| GET | `/health` | No | Health check, returns `{"status": "ok"}` |
+| GET, POST | `/setup` | No | Create the local learner account and profile |
+| GET, POST | `/login` | No | Login page / log in |
+| GET | `/logout` | No | Log out |
+| GET | `/learn` | Yes | Main learning page |
+| POST | `/learn/generate` | Yes | Recommend a module and generate a course |
+| GET | `/course/{cid}` | Yes | Show a generated course |
+| POST | `/course/{cid}/quiz` | Yes | Submit quiz answers (`q0`, `q1`, ...) |
+| POST | `/course/{cid}/assignment` | Yes | Submit an assignment for LLM grading |
+| POST | `/course/{cid}/complete` | Yes | Mark a course complete |
+| GET | `/me` | Yes | Profile, learning record, assessments |
+| POST | `/me/profile` | Yes | Update name, goals and level |
+| POST | `/me/password` | Yes | Change password |
+| POST | `/me/erase` | Yes | Erase the profile and all learning data |
+| GET | `/graph` | Yes | Knowledge graph page |
+
+Login uses a signed session cookie. In Swagger UI, call `/login` first (the browser keeps the cookie), then try the other endpoints. Invalid or missing form fields return HTTP 422.
 
 ## What the app remembers
 
@@ -33,7 +72,7 @@ On first launch, create a local Me profile with a name, username, password, long
 
 The knowledge graph is an evolving estimate. Mastery values are updated as new assessment evidence arrives; they are not permanent labels. The inferred teaching approach is a hypothesis, with evidence and confidence shown in the profile. The current level is user-editable; each generated course separately stores its inferred difficulty level.
 
-The SQLite database stays on the machine running Streamlit. For personalization, the app sends relevant goals, study notes, course/assessment summaries, the latest quiz answers/results for preference inference, and (for assignment grading) the submitted assignment to the LLM provider selected in the sidebar. The username, password, and display name are not sent to the model. The SQLite file itself is not encrypted at rest, so keep the project folder on a machine and account you trust.
+The SQLite database stays on the machine running the server. For personalization, the app sends relevant goals, study notes, course/assessment summaries, the latest quiz answers/results for preference inference, and (for assignment grading) the submitted assignment to the LLM provider selected in the sidebar. The username, password, and display name are not sent to the model. The SQLite file itself is not encrypted at rest, so keep the project folder on a machine and account you trust.
 
 ## Main flow
 
@@ -47,16 +86,14 @@ Generated courses are original learning material grounded in the catalog module;
 
 ## Project files
 
-| File | Purpose |
-|---|---|
-| app.py | Streamlit login, Learn page, Me profile, course display and assessments |
-| learner_store.py | SQLite schema, account hashing, profile, course history and learner graph |
-| pipeline.py | Retrieval planning, course generation, assignment evaluation and preference inference |
-| retriever.py | BM25 + sentence-transformer hybrid retrieval |
-| llm.py | Gemini / Anthropic / OpenAI calls, retries and disk cache |
-| convert_mslearn.py | Microsoft Learn catalog JSON to JSONL snippets |
-| fetch_content.py | Adds lesson text from a Microsoft Learn repository clone |
-| prompts/ | Recommendation, course-generation and assessment prompts |
-
-
-
+| File                | Purpose                                                                               |
+| ------------------- | ------------------------------------------------------------------------------------- |
+| server.py           | FastAPI app: routes, login session, Learn page, Me profile, course display and assessments |
+| learner_store.py    | SQLite schema, account hashing, profile, course history and learner graph             |
+| pipeline.py         | Retrieval planning, course generation, assignment evaluation and preference inference |
+| retriever.py        | BM25 + sentence-transformer hybrid retrieval                                          |
+| llm.py              | Gemini / Anthropic / OpenAI calls, retries and disk cache                             |
+| convert_mslearn.py  | Microsoft Learn catalog JSON to JSONL snippets                                        |
+| fetch_content.py    | Adds lesson text from a Microsoft Learn repository clone                              |
+| templates/, static/ | Jinja HTML pages and static files                                                     |
+| prompts/            | Recommendation, course-generation and assessment prompts                              |
