@@ -7,10 +7,10 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head><body class="app">
 <header class="nav"><div class="wrap">
-  <a class="brand" href="{{ url_for('home') }}"><span>🧭</span><b class="grad">Pxplore</b></a>
+  <a class="brand" href="{{ url_for('learn') }}"><span>🧭</span><b class="grad">Pxplore</b></a>
   {% if display_name %}
   <ul class="tabs-nav"><li><a href="{{ url_for('learn') }}" class="{{ 'on' if active=='learn' }}">Learn</a></li><li><a href="{{ url_for('me') }}" class="{{ 'on' if active=='me' }}">Me</a></li></ul>
-  <div class="who"><span>{{ display_name }}</span><a class="btn ghost small" href="{{ url_for('logout') }}">Log out</a></div>
+  <div class="who"><span>{{ display_name }}</span></div>
   {% endif %}
 </div></header>
 <main class="wrap page">
