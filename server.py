@@ -32,7 +32,7 @@ load_dotenv()
 from learner_store import (  # noqa: E402
     account_exists, add_learning_note, complete_course, create_account, erase_account, get_course,
     get_learning_record, get_profile, init_db, memory_summary, record_assessment,
-    save_course, set_learning_style, update_password, update_profile, verify_login,
+    save_course, set_learning_style, update_profile,
 )
 from pipeline import generate_course, grade_assignment, infer_learning_style, plan  # noqa: E402
 from retriever import HybridRetriever  # noqa: E402
@@ -47,7 +47,7 @@ app = FastAPI(
     title="Pxplore API",
     description="Recommends a Microsoft Learn module, then generates a personalised course with an LLM. "
                 "Most endpoints return HTML pages and accept form posts; /health returns JSON. "
-                "Endpoints tagged 'Learner' need a logged-in session cookie (use /login first).",
+                "There is no login: a single local learner account is created and signed in automatically.",
     version="1.0.0",
 )
 
@@ -181,23 +181,28 @@ def render(request: Request, name: str, **ctx):
     return templates.TemplateResponse(request, name, ctx)
 
 
-# ---------- login protection ----------
+# ---------- automatic sign-in (no login / setup pages) ----------
 
-class LoginRequired(Exception):
-    pass
+DEFAULT_USERNAME = "learner"
+DEFAULT_DISPLAY_NAME = "Learner"
 
 
-def require_login(request: Request):
+def auto_login(request: Request):
+    """Make sure the single local learner account exists and is attached to this session.
+
+    Runs before every learner page. If a profile already exists in data/student_memory.db it is reused
+    (so existing data is kept); otherwise a default one is created with a random, never-shown password.
+    """
+    if not account_exists():
+        try:
+            create_account(DEFAULT_USERNAME, DEFAULT_DISPLAY_NAME, secrets.token_urlsafe(24))
+        except ValueError:  # another request created it first
+            pass
     if "user" not in request.session:
-        raise LoginRequired()
+        request.session["user"] = {"id": 1, "username": DEFAULT_USERNAME}  # the app has exactly one account (id=1)
 
 
-@app.exception_handler(LoginRequired)
-def _redirect_to_login(request: Request, exc: LoginRequired):
-    return redirect(url_for("login"))
-
-
-LOGIN = [Depends(require_login)]
+LOGIN = [Depends(auto_login)]
 
 
 def build_graph_data(profile_data, learning_record):
@@ -293,71 +298,16 @@ def build_graph_data(profile_data, learning_record):
     return graph_data
 
 
-# ---------- landing + auth ----------
+# ---------- entry ----------
 
-@app.get("/", response_class=HTMLResponse, name="home", tags=["Public"], summary="Landing page")
-def home(request: Request):
-    return render(request, "index.html", app_url=url_for("learn"))
+@app.get("/", name="home", tags=["Public"], summary="Go straight to the Learn page")
+def home():
+    return redirect(url_for("learn"))
 
 
 @app.get("/health", name="health", tags=["Public"], summary="Health check")
 def health():
     return {"status": "ok"}
-
-
-@app.get("/setup", response_class=HTMLResponse, name="setup", tags=["Auth"],
-         summary="Account setup page")
-def setup_page(request: Request):
-    if account_exists():
-        return redirect(url_for("login"))
-    return render(request, "auth.html", mode="setup", levels=LEVELS)
-
-
-@app.post("/setup", response_class=HTMLResponse, name="setup", tags=["Auth"],
-          summary="Create the local learner account and profile")
-def setup_submit(request: Request, username: str = Form(...), display_name: str = Form(...),
-                 password: str = Form(...), confirm: str = Form(...), long_goal: str = Form(""),
-                 short_goal: str = Form(""), level: str = Form("beginner")):
-    if account_exists():
-        return redirect(url_for("login"))
-    if password != confirm:
-        flash(request, "The passwords do not match.", "error")
-    else:
-        try:
-            create_account(username, display_name, password)
-            update_profile(display_name, long_goal, short_goal, level)
-            u = verify_login(username, password)
-            request.session["user"] = {"id": u["id"], "username": u["username"]}
-            return redirect(url_for("learn"))
-        except Exception as exc:
-            flash(request, str(exc), "error")
-    return render(request, "auth.html", mode="setup", levels=LEVELS)
-
-
-@app.get("/login", response_class=HTMLResponse, name="login", tags=["Auth"], summary="Login page")
-def login_page(request: Request):
-    if not account_exists():
-        return redirect(url_for("setup"))
-    return render(request, "auth.html", mode="login")
-
-
-@app.post("/login", response_class=HTMLResponse, name="login", tags=["Auth"],
-          summary="Log in (sets the session cookie)")
-def login_submit(request: Request, username: str = Form(...), password: str = Form(...)):
-    if not account_exists():
-        return redirect(url_for("setup"))
-    u = verify_login(username, password)
-    if u:
-        request.session["user"] = {"id": u["id"], "username": u["username"]}
-        return redirect(url_for("learn"))
-    flash(request, "Username or password is incorrect.", "error")
-    return render(request, "auth.html", mode="login")
-
-
-@app.get("/logout", name="logout", tags=["Auth"], summary="Log out and clear the session")
-def logout(request: Request):
-    request.session.clear()
-    return redirect(url_for("home"))
 
 
 # ---------- learn ----------
@@ -573,33 +523,16 @@ def save_profile(request: Request, display_name: str = Form(""), long_goal: str 
     return redirect(url_for("me"))
 
 
-@app.post("/me/password", name="change_password", tags=["Learner"], dependencies=LOGIN,
-          summary="Change the password")
-def change_password(request: Request, old: str = Form(...), new: str = Form(...), confirm: str = Form(...)):
-    if new != confirm:
-        flash(request, "The new passwords do not match.", "error")
-    else:
-        try:
-            update_password(request.session["user"]["username"], old, new, uid(request))
-            flash(request, "Password updated.", "success")
-        except ValueError as exc:
-            flash(request, str(exc), "error")
-    return redirect(url_for("me"))
-
-
 @app.post("/me/erase", name="erase", tags=["Learner"], dependencies=LOGIN,
-          summary="Erase the profile and all learning data (type ERASE and enter the password)")
-def erase(request: Request, confirm_text: str = Form(""), password: str = Form("")):
+          summary="Erase the profile and all learning data (type ERASE to confirm)")
+def erase(request: Request, confirm_text: str = Form("")):
     if confirm_text != "ERASE":
         flash(request, "Type ERASE exactly to confirm.", "error")
-    elif not verify_login(request.session["user"]["username"], password):
-        flash(request, "Password is incorrect.", "error")
-    else:
-        erase_account()
-        request.session.clear()
-        flash(request, "All learner data was erased.", "success")
-        return redirect(url_for("home"))
-    return redirect(url_for("me"))
+        return redirect(url_for("me"))
+    erase_account()
+    request.session.clear()  # a fresh default profile is created automatically on the next page
+    flash(request, "All learner data was erased.", "success")
+    return redirect(url_for("learn"))
 
 
 @app.get("/graph", response_class=HTMLResponse, name="graph", tags=["Learner"],
