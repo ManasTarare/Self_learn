@@ -1,7 +1,7 @@
 {% extends "base.html" %}{% block title %}Me{% endblock %}
 {% block content %}
 <h1>Me</h1>
-<p class="muted">Your profile database is local. Goals, study notes, course and assessment summaries, quiz results and assignment submissions can be sent to the selected LLM provider for personalization and grading. Username, password and display name are not sent.</p>
+<p class="muted">Your profile database is local. Goals, study notes, course and assessment summaries, quiz results and assignment submissions can be sent to the selected LLM provider for personalization and grading. Your display name is not sent.</p>
 <div class="tabs"><button data-t="t1" class="on">Profile</button><button data-t="t2">Knowledge graph</button><button data-t="t3">Learning record</button></div>
 
 <section id="t1" class="tab on">
@@ -17,17 +17,10 @@
   <p class="muted">Confidence: {{ profile.style_confidence }}. This is a tentative preference inferred from your learning record.</p>
   <ul>{% for e in evidence %}<li>{{ e }}</li>{% endfor %}</ul>
   <p class="muted">We avoid treating one test score as proof of a fixed learning style.</p>
-  <details class="panel"><summary>Change password</summary>
-    <form method="post" action="{{ url_for('change_password') }}" class="form">
-      <label>Current password<input type="password" name="old" required></label>
-      <label>New password<input type="password" name="new" required minlength="8"></label>
-      <label>Confirm new password<input type="password" name="confirm" required></label>
-      <button class="btn ghost">Update password</button></form></details>
   <details class="panel danger"><summary>Erase your profile and all learning data</summary>
     <p class="muted">This deletes your saved goals, generated courses, assessment results and knowledge graph.</p>
     <form method="post" action="{{ url_for('erase') }}" class="form" onsubmit="return confirm('Erase everything? This cannot be undone.')">
       <label>Type ERASE to confirm<input name="confirm_text" required></label>
-      <label>Enter your password<input type="password" name="password" required></label>
       <button class="btn danger-btn">Erase everything</button></form></details>
 </section>
 
